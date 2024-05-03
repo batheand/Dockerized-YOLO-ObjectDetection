@@ -1,0 +1,9 @@
+flask
+cv2
+opencv-python-headless 
+onnxruntime
+numpy
+scipy
+base64
+colorsys
+random
