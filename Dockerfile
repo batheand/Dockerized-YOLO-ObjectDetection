@@ -1,18 +1,34 @@
-# Base Image
-FROM python:3.8-slim  
+# Use the official Python image as a parent image
+FROM python:3.8-slim
 
-# Working Directory
+# Set environment variables to avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    build-essential \
+    cmake \
+    wget \
+    libopencv-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory
 WORKDIR /app
 
-# Install Dependencies
-COPY requirements.txt ./ 
-RUN pip install -r requirements.txt 
+# Copy the requirements file and install Python dependencies
+COPY requirements.txt requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-# Copy Code to Image
-COPY . ./  
+# Copy the rest of the application code
+COPY . .
 
-# Expose the port on which Flask runs
-EXPOSE 5000  
+# Copy the ONNX model file into the Docker image
+COPY src/yolov4.onnx /app/src/yolov4.onnx
 
-# Command to Run the Application
-CMD ["python", "main.py"]  # Assuming your main Flask file is named app.py
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Set the entry point to run the application
+CMD ["python", "main.py"]

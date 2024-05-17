@@ -1,9 +1,5 @@
 flask
-cv2
-opencv-python-headless 
-onnxruntime
+opencv-python-headless
+onnxruntime<=1.10.0
 numpy
 scipy
-base64
-colorsys
-random

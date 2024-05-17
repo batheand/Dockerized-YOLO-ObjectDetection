@@ -12,6 +12,12 @@ app = Flask(__name__)
 # Load the pre-trained YOLO model in ONNX format
 model = cv2.dnn.readNetFromONNX('src/yolov4.onnx')
 
+def load_image(image_data):
+    nparr = np.frombuffer(image_data, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    return img
+
+
 @app.route('/detect/<label>', methods=['POST'])
 def detect_objects(label):
     # Some hard-coded values, such as the input size
