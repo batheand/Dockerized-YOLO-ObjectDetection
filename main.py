@@ -21,13 +21,8 @@ def load_image(image_data):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     return img
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-
-@app.route('/detect/<label>', methods=['POST'])
-def detect_objects(label):
+@app.route('/detect', methods=['POST'])
+def detect_objects():
     # Some hard-coded values, such as the input size
     input_size = 416
     # Get the image file from the request
@@ -45,15 +40,13 @@ def detect_objects(label):
     image_data = image[np.newaxis, ...].astype(np.float32)
 
     # Perform object detection using the YOLO model
-    detected_objects = perform_object_detection(image_data, label)
+    detected_objects = perform_object_detection(image_data)
 
     # Draw bounding boxes, labels, and confidence on the image
     image, bboxes = draw_bounding_boxes(detect_objects, original_image_size, input_size, image)
 
     # Convert the image to base64 encoded string
     image_base64 = convert_image_to_base64(image)
-
-
 
     # Prepare the detection results in JSON format
     detection_results = prepare_detection_results(image_base64, bboxes)
@@ -83,7 +76,7 @@ def image_preprocess(image, target_size, gt_boxes=None):
         return image_padded, gt_boxes
 
 
-def perform_object_detection(image, label):
+def perform_object_detection(image):
     sess = rt.InferenceSession("src/yolov4.onnx")
 
     outputs = sess.get_outputs()
@@ -291,5 +284,5 @@ def prepare_detection_results(image_base64, boxes):
     return detection_results
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
 
