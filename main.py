@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import cv2
 import numpy as np
 import base64
@@ -12,10 +12,18 @@ app = Flask(__name__)
 # Load the pre-trained YOLO model in ONNX format
 model = cv2.dnn.readNetFromONNX('src/yolov4.onnx')
 
+# Add class names to an array
+with open("src/coco.names", "r") as f:
+        class_names = f.read().splitlines()
+
 def load_image(image_data):
     nparr = np.frombuffer(image_data, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     return img
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 
 @app.route('/detect/<label>', methods=['POST'])
@@ -23,14 +31,14 @@ def detect_objects(label):
     # Some hard-coded values, such as the input size
     input_size = 416
     # Get the image file from the request
-    image_file = request.files['image']
+    original_image_file = request.files['image']
 
     # Read the image file
-    image = cv2.imdecode(np.fromstring(image_file.read(), np.uint8), cv2.IMREAD_COLOR)
-    original_image_size = image.shape[:2]
+    original_image = cv2.imdecode(np.fromstring(original_image_file.read(), np.uint8), cv2.IMREAD_COLOR)
+    original_image_size = original_image.shape[:2]
 
     # Convert the image to numpy array
-    image = np.array(image)
+    image = np.array(original_image)
 
     # Preprocess the image for object detection
     image = image_preprocess(image, [input_size, input_size])
@@ -40,13 +48,15 @@ def detect_objects(label):
     detected_objects = perform_object_detection(image_data, label)
 
     # Draw bounding boxes, labels, and confidence on the image
-    draw_bounding_boxes(detect_objects, original_image_size, input_size, image)
+    image, bboxes = draw_bounding_boxes(detect_objects, original_image_size, input_size, image)
 
     # Convert the image to base64 encoded string
     image_base64 = convert_image_to_base64(image)
 
+
+
     # Prepare the detection results in JSON format
-    detection_results = prepare_detection_results(image_base64, detected_objects)
+    detection_results = prepare_detection_results(image_base64, bboxes)
 
     return jsonify(detection_results)
 
@@ -74,7 +84,7 @@ def image_preprocess(image, target_size, gt_boxes=None):
 
 
 def perform_object_detection(image, label):
-    sess = rt.InferenceSession("model.onnx")
+    sess = rt.InferenceSession("src/yolov4.onnx")
 
     outputs = sess.get_outputs()
     output_names = list(map(lambda output: output.name, outputs))
@@ -115,7 +125,7 @@ def postprocess_bbbox(pred_bbox, ANCHORS, STRIDES, XYSCALE=[1,1,1]):
         xy_grid = np.expand_dims(np.stack(xy_grid, axis=-1), axis=2)
 
         xy_grid = np.tile(np.expand_dims(xy_grid, axis=0), [1, 1, 1, 3, 1])
-        xy_grid = xy_grid.astype(np.float)
+        xy_grid = xy_grid.astype(float)
 
         pred_xy = ((special.expit(conv_raw_dxdy) * XYSCALE[i]) - 0.5 * (XYSCALE[i] - 1) + xy_grid) * STRIDES[i]
         pred_wh = (np.exp(conv_raw_dwdh) * ANCHORS[i])
@@ -230,7 +240,7 @@ def read_class_names(class_file_name):
             names[ID] = name.strip('\n')
     return names
 
-def draw_bbox(image, bboxes, classes=read_class_names("coco.names"), show_label=True):
+def draw_bbox(image, bboxes, classes=read_class_names("src/coco.names"), show_label=True):
     """
     bboxes: [x_min, y_min, x_max, y_max, probability, cls_id] format coordinates.
     """
@@ -269,11 +279,14 @@ def convert_image_to_base64(image):
     image_base64 = base64.b64encode(buffer).decode('utf-8')
     return image_base64
 
-def prepare_detection_results(image_base64, detected_objects):
+def prepare_detection_results(image_base64, boxes):
+
     detection_results = {
         'image': image_base64,
-        'objects': [],
-        'count': len(detected_objects)
+
+        'objects': [{'label': class_names[int(boxes[i][5])], 'x': (boxes[i][0]+boxes[i][2])/2, 'y': (boxes[i][1]+boxes[i][3])/2, 'width': (boxes[i][2] - boxes[i][0]), 'height': boxes[i][3] - boxes[i][1], 'confidence': boxes[i][4]} for i in range(len(boxes))],
+        
+        'count': len(boxes)
     }
     return detection_results
 
