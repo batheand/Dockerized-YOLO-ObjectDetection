@@ -30,6 +30,7 @@ def detect_objects():
 
     # Read the image file
     original_image = cv2.imdecode(np.fromstring(original_image_file.read(), np.uint8), cv2.IMREAD_COLOR)
+    original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
     original_image_size = original_image.shape[:2]
 
     # Convert the image to numpy array
@@ -43,7 +44,7 @@ def detect_objects():
     detected_objects = perform_object_detection(image_data)
 
     # Draw bounding boxes, labels, and confidence on the image
-    image, bboxes = draw_bounding_boxes(detect_objects, original_image_size, input_size, image)
+    image, bboxes = draw_bounding_boxes(detected_objects, original_image_size, input_size, original_image)
 
     # Convert the image to base64 encoded string
     image_base64 = convert_image_to_base64(image)
@@ -99,6 +100,8 @@ def draw_bounding_boxes(detections, original_image_size, input_size, original_im
     bboxes = postprocess_boxes(pred_bbox, original_image_size, input_size, 0.25)
     bboxes = nms(bboxes, 0.213, method='nms')
     image = draw_bbox(original_image, bboxes)
+
+    return image, bboxes
 
 def get_anchors(anchors_path, tiny=False):
     '''loads the anchors from a file'''
@@ -285,4 +288,3 @@ def prepare_detection_results(image_base64, boxes):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
