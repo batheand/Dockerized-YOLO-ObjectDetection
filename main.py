@@ -16,13 +16,9 @@ model = cv2.dnn.readNetFromONNX('src/yolov4.onnx')
 with open("src/coco.names", "r") as f:
         class_names = f.read().splitlines()
 
-def load_image(image_data):
-    nparr = np.frombuffer(image_data, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    return img
-
-@app.route('/detect', methods=['POST'])
-def detect_objects():
+@app.route('/detect/', defaults={'label': None}, methods=['POST'])
+@app.route('/detect/<label>', methods=['POST'])
+def detect_objects(label):
     # Some hard-coded values, such as the input size
     input_size = 416
     # Get the image file from the request
@@ -44,13 +40,13 @@ def detect_objects():
     detected_objects = perform_object_detection(image_data)
 
     # Draw bounding boxes, labels, and confidence on the image
-    image, bboxes = draw_bounding_boxes(detected_objects, original_image_size, input_size, original_image)
+    image, bboxes = draw_bounding_boxes(detected_objects, original_image_size, input_size, original_image, label)
 
     # Convert the image to base64 encoded string
     image_base64 = convert_image_to_base64(image)
 
     # Prepare the detection results in JSON format
-    detection_results = prepare_detection_results(image_base64, bboxes)
+    detection_results = prepare_detection_results(image_base64, bboxes, label)  
 
     return jsonify(detection_results)
 
@@ -89,7 +85,7 @@ def perform_object_detection(image):
 
     return detections
 
-def draw_bounding_boxes(detections, original_image_size, input_size, original_image):
+def draw_bounding_boxes(detections, original_image_size, input_size, original_image, label):
     ANCHORS = "./src/yolov4_anchors.txt"
     STRIDES = [8, 16, 32]
     XYSCALE = [1.2, 1.1, 1.05]
@@ -99,7 +95,7 @@ def draw_bounding_boxes(detections, original_image_size, input_size, original_im
     pred_bbox = postprocess_bbbox(detections, ANCHORS, STRIDES, XYSCALE)
     bboxes = postprocess_boxes(pred_bbox, original_image_size, input_size, 0.25)
     bboxes = nms(bboxes, 0.213, method='nms')
-    image = draw_bbox(original_image, bboxes)
+    image = draw_bbox(original_image, bboxes, label=label)
 
     return image, bboxes
 
@@ -236,7 +232,7 @@ def read_class_names(class_file_name):
             names[ID] = name.strip('\n')
     return names
 
-def draw_bbox(image, bboxes, classes=read_class_names("src/coco.names"), show_label=True):
+def draw_bbox(image, bboxes, classes=read_class_names("src/coco.names"), show_label=True, label=None):
     """
     bboxes: [x_min, y_min, x_max, y_max, probability, cls_id] format coordinates.
     """
@@ -252,21 +248,39 @@ def draw_bbox(image, bboxes, classes=read_class_names("src/coco.names"), show_la
     random.seed(None)
 
     for i, bbox in enumerate(bboxes):
-        coor = np.array(bbox[:4], dtype=np.int32)
-        fontScale = 0.5
-        score = bbox[4]
-        class_ind = int(bbox[5])
-        bbox_color = colors[class_ind]
-        bbox_thick = int(0.6 * (image_h + image_w) / 600)
-        c1, c2 = (coor[0], coor[1]), (coor[2], coor[3])
-        cv2.rectangle(image, c1, c2, bbox_color, bbox_thick)
+        if label is None:    
+            coor = np.array(bbox[:4], dtype=np.int32)
+            fontScale = 0.5
+            score = bbox[4]
+            class_ind = int(bbox[5])
+            bbox_color = colors[class_ind]
+            bbox_thick = int(0.6 * (image_h + image_w) / 600)
+            c1, c2 = (coor[0], coor[1]), (coor[2], coor[3])
+            cv2.rectangle(image, c1, c2, bbox_color, bbox_thick)
 
-        if show_label:
-            bbox_mess = '%s: %.2f' % (classes[class_ind], score)
-            t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick//2)[0]
-            cv2.rectangle(image, c1, (c1[0] + t_size[0], c1[1] - t_size[1] - 3), bbox_color, -1)
-            cv2.putText(image, bbox_mess, (c1[0], c1[1]-2), cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale, (0, 0, 0), bbox_thick//2, lineType=cv2.LINE_AA)
+            if show_label:
+                bbox_mess = '%s: %.2f' % (classes[class_ind], score)
+                t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick//2)[0]
+                cv2.rectangle(image, c1, (c1[0] + t_size[0], c1[1] - t_size[1] - 3), bbox_color, -1)
+                cv2.putText(image, bbox_mess, (c1[0], c1[1]-2), cv2.FONT_HERSHEY_SIMPLEX,
+                            fontScale, (0, 0, 0), bbox_thick//2, lineType=cv2.LINE_AA)
+        else: 
+            if classes[int(bbox[5])] == label:
+                coor = np.array(bbox[:4], dtype=np.int32)
+                fontScale = 0.5
+                score = bbox[4]
+                class_ind = int(bbox[5])
+                bbox_color = colors[class_ind]
+                bbox_thick = int(0.6 * (image_h + image_w) / 600)
+                c1, c2 = (coor[0], coor[1]), (coor[2], coor[3])
+                cv2.rectangle(image, c1, c2, bbox_color, bbox_thick)
+
+                if show_label:
+                    bbox_mess = '%s: %.2f' % (classes[class_ind], score)
+                    t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick//2)[0]
+                    cv2.rectangle(image, c1, (c1[0] + t_size[0], c1[1] - t_size[1] - 3), bbox_color, -1)
+                    cv2.putText(image, bbox_mess, (c1[0], c1[1]-2), cv2.FONT_HERSHEY_SIMPLEX,
+                                fontScale, (0, 0, 0), bbox_thick//2, lineType=cv2.LINE_AA)
 
     return image
 
@@ -275,15 +289,21 @@ def convert_image_to_base64(image):
     image_base64 = base64.b64encode(buffer).decode('utf-8')
     return image_base64
 
-def prepare_detection_results(image_base64, boxes):
+def prepare_detection_results(image_base64, boxes, label=None):
+    if label is None:
+        detection_results = {
+            'image': image_base64,
 
-    detection_results = {
-        'image': image_base64,
-
-        'objects': [{'label': class_names[int(boxes[i][5])], 'x': (boxes[i][0]+boxes[i][2])/2, 'y': (boxes[i][1]+boxes[i][3])/2, 'width': (boxes[i][2] - boxes[i][0]), 'height': boxes[i][3] - boxes[i][1], 'confidence': boxes[i][4]} for i in range(len(boxes))],
-        
-        'count': len(boxes)
-    }
+            'objects': [{'label': class_names[int(boxes[i][5])], 'x': (boxes[i][0]+boxes[i][2])/2, 'y': (boxes[i][1]+boxes[i][3])/2, 'width': (boxes[i][2] - boxes[i][0]), 'height': boxes[i][3] - boxes[i][1], 'confidence': boxes[i][4]} for i in range(len(boxes))],
+            
+            'count': len(boxes)
+        }
+    else:
+        detection_results = {
+            'image': image_base64,
+            'objects': [{'label': class_names[int(boxes[i][5])], 'x': (boxes[i][0]+boxes[i][2])/2, 'y': (boxes[i][1]+boxes[i][3])/2, 'width': (boxes[i][2] - boxes[i][0]), 'height': boxes[i][3] - boxes[i][1], 'confidence': boxes[i][4]} for i in range(len(boxes)) if class_names[int(boxes[i][5])] == label],
+            'count': len([box for box in boxes if class_names[int(box[5])] == label])
+        }
     return detection_results
 
 if __name__ == '__main__':
