@@ -16,14 +16,13 @@ The model takes requests the image, then handles all the rest in one main method
 ## Getting Started
 
 ### Download the model 
-After downloading the repository, you must first open the download_dependencies.ipynb file to download our model.
+After downloading the repository, you must first open and run the download_dependencies.ipynb file to download our model.
 
 ### Run the Microservice
-After downloading the model, you must run the microservice on Docker using the command 
+After downloading the model, you must run the microservice on Docker using the following command on the directory that the repository is in.
 
     docker-compose up
-on the directory that the repository is in.
-
+    
 ### Quickstart (Optional)
 If you want to quickly get your hands wet and test the capabilities of the microservice you can follow the quickstart.ipynb file and see how the microservice performs.
 
