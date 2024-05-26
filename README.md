@@ -3,7 +3,7 @@ Using Flask and Yolov4, this project creates a working YOLO microservice.
 
 ### Before starting
 
-Please run the download_model.py, which will download the onnx model, as the file is around 250 mbs it might take a while.
+Please run the download_dependencies.ipynb, which will download the onnx model, as the file is around 250 mbs it might take a while.
 
 ### Why ONNX?
 
